@@ -1,0 +1,10 @@
+2024-10-04T19:39:39.622Z - This is a test error
+Error: This is a test error
+    at Object.<anonymous> (C:\Users\goyge\Dev-Projects\Cody\app.js:40:7)
+    at Module._compile (node:internal/modules/cjs/loader:1469:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1548:10)
+    at Module.load (node:internal/modules/cjs/loader:1288:32)
+    at Module._load (node:internal/modules/cjs/loader:1104:12)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:174:12)
+    at node:internal/main/run_main_module:28:49
+
