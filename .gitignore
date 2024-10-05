@@ -9,7 +9,7 @@ backups/
 !logs/*.txt
 
 # Ignore environment files
-.env
+*.env
 
 # Ignore Git files and lock files
 .git/
@@ -18,7 +18,3 @@ backups/
 # Ignore system-specific files
 .DS_Store
 Thumbs.db
-
-
-# Ignore environment and sensitive files
-*.env
