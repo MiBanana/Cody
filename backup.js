@@ -5,9 +5,10 @@ const { exec } = require('child_process');
 let lastActivityTime = new Date();
 let isIdle = false;
 let backupInterval;
-let backupInProgress = false; // Locking variable for backup process
+let backupInProgress = false;
 const idleTimeout = 10 * 60 * 1000; // 10 minutes for idle detection
 const backupIntervalMinutes = 60; // Set backup interval to 60 minutes
+const lastBackupFile = path.join(__dirname, 'lastBackup.json'); // Track modified time
 
 // Get the command-line arguments
 const args = process.argv.slice(2);
@@ -24,51 +25,72 @@ if (!fs.existsSync(backupDir)) {
   fs.mkdirSync(backupDir, { recursive: true });
 }
 
-// Asynchronous function to perform the backup
+// Read last backup timestamp
+const getLastBackupTime = () => {
+  if (fs.existsSync(lastBackupFile)) {
+    const data = fs.readFileSync(lastBackupFile);
+    const parsed = JSON.parse(data);
+    return new Date(parsed.timestamp);
+  }
+  return new Date(0); // No backup yet
+};
+
+// Save the timestamp of the latest backup
+const saveLastBackupTime = (time) => {
+  const data = JSON.stringify({ timestamp: time });
+  fs.writeFileSync(lastBackupFile, data);
+};
+
+// Asynchronous function to perform the incremental backup
 const performBackup = async () => {
   if (backupInProgress) {
     console.log('Backup already in progress. Skipping new backup.');
     return;
   }
 
-  backupInProgress = true; // Set lock to prevent multiple backups
+  backupInProgress = true;
 
   const startTime = new Date();
   console.log(`Starting backup at: ${startTime.toISOString()}`);
 
+  const lastBackupTime = getLastBackupTime(); // Get last backup time
   const timestamp = new Date().toISOString().replace(/:/g, '-');
   const backupPath = path.join(backupDir, `backup-${timestamp}`);
 
-  // Ensure the backupPath folder is created before copying files
   if (!fs.existsSync(backupPath)) {
     fs.mkdirSync(backupPath, { recursive: true });
   }
 
   try {
-    const files = await fs.promises.readdir(projectDir); // Asynchronous file reading
+    const files = await fs.promises.readdir(projectDir);
     for (const file of files) {
       const srcPath = path.join(projectDir, file);
       const destPath = path.join(backupPath, file);
+      const stats = fs.statSync(srcPath);
 
-      // Exclude unnecessary directories
+      // Exclude unnecessary directories and files
       if (
         srcPath.includes('node_modules') ||
         srcPath.includes('.git') ||
         srcPath.includes('logs') ||
         srcPath.includes('backups')
       ) {
-        continue; // Skip these directories
+        continue;
       }
 
-      console.log(`Copying: ${srcPath}`);
-
-      // Asynchronous file copying
-      await fs.promises.copyFile(srcPath, destPath);
+      // Check if file has been modified since the last backup
+      if (stats.mtime > lastBackupTime) {
+        console.log(`Copying modified file: ${srcPath}`);
+        await fs.promises.copyFile(srcPath, destPath);
+      }
     }
 
     const endTime = new Date();
     console.log(`Backup completed at: ${endTime.toISOString()}`);
     console.log(`Total time: ${(endTime - startTime) / 1000} seconds`);
+
+    // Save the time of the latest backup
+    saveLastBackupTime(startTime);
 
     // Run the updateReadme.js script to update the README with the last backup time
     exec('node updateReadme.js', (err, stdout, stderr) => {
@@ -79,7 +101,7 @@ const performBackup = async () => {
       console.log(`README updated: ${stdout}`);
 
       // Automatically commit and push changes to GitHub after backup
-      exec('git add . && git commit -m "Automated backup" && git push', (err2, stdout2, stderr2) => {
+      exec('git add . && git commit -m "Automated incremental backup" && git push', (err2, stdout2, stderr2) => {
         if (err2) {
           console.error(`Error committing and pushing to GitHub: ${err2.message}`);
           console.error(`stderr: ${stderr2}`);
@@ -91,7 +113,7 @@ const performBackup = async () => {
   } catch (err) {
     console.error('Error during backup:', err);
   } finally {
-    backupInProgress = false; // Release the lock once the backup completes
+    backupInProgress = false;
   }
 };
 
@@ -100,7 +122,7 @@ const resetIdleTimeout = () => {
   lastActivityTime = new Date();
   if (isIdle) {
     console.log('User is active again. Starting the backup timer.');
-    startBackupTimer(); // Restart the backup timer
+    startBackupTimer();
     isIdle = false;
   }
 };
@@ -111,7 +133,7 @@ const checkIdle = () => {
   const timeSinceLastActivity = currentTime - lastActivityTime;
   if (timeSinceLastActivity >= idleTimeout) {
     console.log('User has been idle. Stopping backups.');
-    clearInterval(backupInterval); // Stop backup timer when idle
+    clearInterval(backupInterval);
     isIdle = true;
   }
 };
@@ -126,18 +148,17 @@ const startBackupTimer = () => {
     } else {
       console.log('User is idle, backup skipped.');
     }
-  }, backupIntervalMinutes * 60 * 1000); // Set backup interval
+  }, backupIntervalMinutes * 60 * 1000);
 };
 
 // Monitor file changes to detect activity
 fs.watch(projectDir, { recursive: true }, (eventType, filename) => {
   console.log(`Activity detected: ${eventType} on ${filename}`);
-  resetIdleTimeout(); // Reset the idle timer on user activity
+  resetIdleTimeout();
 });
 
 // Main Execution Logic
 if (args.includes('--manual')) {
-  // Perform manual backup and exit
   performBackup()
     .then(() => {
       console.log('Manual backup complete.');
@@ -148,10 +169,7 @@ if (args.includes('--manual')) {
       process.exit(1);
     });
 } else {
-  // Start automated backup
-  resetIdleTimeout(); // Start with initial activity
-  startBackupTimer(); // Start the backup process
-
-  // Check for idle state every minute
+  resetIdleTimeout();
+  startBackupTimer();
   setInterval(checkIdle, 60 * 1000); // Check if user is idle every minute
-}
+};
