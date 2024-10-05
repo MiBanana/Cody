@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 Cody Project - README
 Table of Contents:
 Project Overview
