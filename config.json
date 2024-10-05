@@ -1,0 +1,4 @@
+{
+    "backupIntervalMinutes": 60,
+    "backupEnabled": true
+}

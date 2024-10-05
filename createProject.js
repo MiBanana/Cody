@@ -1,11 +1,10 @@
-const fs = require('fs-extra');  // Ensure fs-extra is installed
+const fs = require('fs-extra');
 const path = require('path');
-const { exec } = require('child_process');  // For executing Git commands
+const readline = require('readline');
+const { exec } = require('child_process');
 
-// Define the path to your template and where to copy the new project
-const templatePath = path.join(__dirname, 'Cody');  // Adjust the path to where your Cody template is stored
-
-// Get the new project name from the command line arguments
+// Define paths
+const templatePath = path.join(__dirname, 'Cody');  // Your Cody template
 const projectName = process.argv[2];
 
 if (!projectName) {
@@ -21,21 +20,49 @@ if (fs.existsSync(newProjectPath)) {
     process.exit(1);
 }
 
-// Copy the Cody template folder to the new project folder
+// Function to prompt for user input
+const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+});
+
+// Copy the Cody template to the new project folder
 fs.copy(templatePath, newProjectPath)
     .then(() => {
         console.log(`Project ${projectName} created successfully!`);
 
-        // Initialize Git in the new project
-        exec(`cd ${newProjectPath} && git init`, (err, stdout, stderr) => {
-            if (err) {
-                console.error('Error initializing Git:', err);
+        // Prompt for GitHub repository URL
+        rl.question('Enter the GitHub repository URL for this project: ', (repoUrl) => {
+            if (!repoUrl) {
+                console.log('No GitHub URL provided. Skipping Git setup.');
+                rl.close();
                 return;
             }
-            console.log(stdout);
-            console.log('Git initialized successfully in', projectName);
+
+            // Initialize Git and add the remote repository
+            exec(`cd ${newProjectPath} && git init && git remote add origin ${repoUrl}`, (err, stdout, stderr) => {
+                if (err) {
+                    console.error('Error initializing Git or adding remote:', err);
+                    rl.close();
+                    return;
+                }
+                console.log(stdout);
+                console.log(`Git initialized and remote set to ${repoUrl} for project ${projectName}`);
+
+                // Optionally, push the initial commit
+                exec(`cd ${newProjectPath} && git add . && git commit -m "Initial commit" && git push -u origin main`, (pushErr, pushStdout, pushStderr) => {
+                    if (pushErr) {
+                        console.error('Error during the initial push:', pushErr);
+                    } else {
+                        console.log(pushStdout);
+                        console.log(`Project ${projectName} pushed to ${repoUrl}`);
+                    }
+                    rl.close();
+                });
+            });
         });
     })
     .catch(err => {
         console.error('Error creating the project:', err);
+        rl.close();
     });
