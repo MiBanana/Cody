@@ -1,3 +1,17 @@
+# Ignore node_modules folder
 node_modules/
-.vscode/
-*.log
+
+# Ignore logs and backups
+logs/
+backups/
+
+# Ignore environment files
+.env
+
+# Ignore Git files and lock files
+.git/
+*.lock
+
+# Ignore system-specific files
+.DS_Store
+Thumbs.db
