@@ -2,8 +2,11 @@
 node_modules/
 
 # Ignore logs and backups
-logs/
+logs/*
 backups/
+
+# But do track specific logs
+!logs/*.txt
 
 # Ignore environment files
 .env
@@ -15,3 +18,7 @@ backups/
 # Ignore system-specific files
 .DS_Store
 Thumbs.db
+
+
+# Ignore environment and sensitive files
+*.env
